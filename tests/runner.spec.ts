@@ -24,7 +24,7 @@ const ordinaryTurn: Script = (session, message, turn) => {
   session.append('step/start', { turn, step: 1 })
   session.append('user/message', message, { surfaceOp: 'append' })
   session.append('tool/call', {
-    turn, step: 1, callId: `call-${turn}`, name: 'write_file', arguments: '{}',
+    turn, step: 1, callId: `call-${turn}` as never, name: 'write_file', arguments: '{}',
   })
   session.append('tool/result', {
     turn, step: 1, message: { role: 'tool', content: [] } as never,
@@ -237,7 +237,7 @@ describe('a turn in a conversation the hive minted', () => {
       session.append('step/start', { turn, step: 1 })
       session.append('user/message', message, { surfaceOp: 'append' })
       session.append('tool/call', {
-        turn, step: 1, callId: 'c1', name: 'write_file', arguments: 'not json',
+        turn, step: 1, callId: 'c1' as never, name: 'write_file', arguments: 'not json',
       })
       session.append('tool/result', {
         turn,

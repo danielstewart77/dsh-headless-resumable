@@ -28,6 +28,9 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+
+/** dsh's own reason for a turn ending, whatever kinds it currently carries. */
+type TurnEndReason = SessionEvent<'turn/end'>['data']['reason']
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-cmdline'
 
@@ -60,8 +63,15 @@ export interface TurnReport {
   sessionId: string
   /** Whether this process opened the conversation or continued it. */
   mode: SessionMode
-  /** How the turn ended, as dsh's own turn-end reason kind, or `refused`. */
-  outcome: 'completed' | 'error' | 'aborted' | 'refused' | 'unknown'
+  /**
+   * How the turn ended: dsh's own turn-end reason kind, or `refused` for an
+   * invocation that never reached a model. Taken from their type rather than
+   * spelled out here, because the set is theirs to extend -- and `max-tokens`
+   * in particular is the context ceiling, which is a measurement this loop
+   * wants recorded rather than a failure to explain away. `unknown` is an
+   * interval holding no turn at all.
+   */
+  outcome: TurnEndReason['kind'] | 'refused' | 'unknown'
   /** The last non-empty assistant text of this turn's interval. */
   text: string
   /** The tool traffic of this turn's interval. */
@@ -201,7 +211,7 @@ export async function run(ctx: Context, config: Config, io: RunnerIo): Promise<v
 
   const { text, reason } = summarize(agent.session.events, firstSeq)
   const traffic = toolTraffic(agent.session.events, firstSeq)
-  const outcome: TurnReport['outcome'] = reason === undefined ? 'unknown' : reason.kind
+  const outcome: TurnReport['outcome'] = reason?.kind ?? 'unknown'
   report(io, {
     sessionId: config.sessionId,
     mode: config.mode,
