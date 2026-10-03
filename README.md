@@ -34,14 +34,16 @@ was a surface exposing them. This is that surface, and nothing else.
   rewrite the history of a run we are measuring. The model-free tool-result
   pruner stays on.
 
-## Why it lives in this checkout
+## Where it lives
 
-It is meant to be out-of-tree, and it is — its own git repository, its own
-package, no patch to any upstream file but one line in `pnpm-workspace.yaml`.
-It sits *inside* the upstream checkout only because the npm-published
-`@deepseek-ai` set cannot be installed on its own: `dsh-agent@0.1.0-rc.6` needs
-`dsh-invariants@^0.1.0-rc.6` and the published invariants is `0.0.1-rc.1`. The
-workspace is the only place those specifiers resolve.
+In the tree, at `hive/dsh-headless-resumable`, a workspace member named in
+`pnpm-workspace.yaml`. This harness is maintained independently of the
+DeepSeek developer preview it was forked from, so there is no upstream to stay
+out of the way of and nothing is gained by keeping the surface at arm's length.
+
+A published copy of this one package lives at
+`github.com/danielstewart77/dsh-headless-resumable`, MIT, for anyone running
+the preview itself. The tree here is the working copy.
 
 ## Tests
 
@@ -61,13 +63,26 @@ The tests run the module in-process. This runs it the way a mind will: the real
 
 `profile/` is that profile — `package.json` naming the two bundle layers
 (`@deepseek-ai/dsh-base`, then this package) and `cordis.patch.yml` pointing the
-model seam at this host's inference proxy. Copy it to
+model seam at this host's inference proxy. Nothing in it is defaulted: the
+model, its provider route, that route's endpoint and the model's context window
+all come from the spawn's environment (`DSH_MODEL`, `DSH_PROVIDER`,
+`DSH_PROXY_BASE_URL`, `DSH_MODEL_CONTEXT_WINDOW`), because the gateway resolves
+the model per session and a profile holding a house favourite is how a wrong
+model goes unnoticed for weeks. Copy it to
 `$DSH_HOME/profiles/hive/`, symlink this package into the profile's
 `node_modules/@hive/`, and export `HIVE_PROXY_KEY` with the mind's proxy
 credential. `dsh` resolves every in-box bundle from its own installation, so
 only this package needs the link.
 
-The upstream monorepo has to be built first, both faces:
+This package is compiled by the host TypeScript project — it is a reference of
+`tsconfig.host.json`, and its `exports` point at that emit (`lib/types/*.js`)
+rather than at `src/*.ts`. Plain `node` cannot load a `.ts` entry, so a profile
+symlinking the source tree would die at its first import with
+`ERR_UNKNOWN_FILE_EXTENSION`. It is deliberately **not** in `tsdown`'s
+workspace list: a bundled `lib/index.js` buys nothing for a plugin that is only
+ever resolved from the tree it was built in.
+
+The monorepo has to be built first, both faces:
 
 ```sh
 ./node_modules/.bin/tsc -b tsconfig.host.json
@@ -83,6 +98,9 @@ mounts `dsh-api-gateway`, whose `lib/index.js` is emitted by the client face.
 
 What it shows, on `qwen35-131k` through the proxy:
 
+- `--task-file <path>` carries a turn argv cannot: a composed system prompt
+  plus a user message runs past `MAX_ARG_STRLEN` (128 KiB), which is a limit on
+  one argv entry regardless of total command-line room.
 - `--session-id <id> "..."` answers in the id it was handed and reports
   `{"mode":"create","outcome":"completed"}`.
 - `--resume <id> "..."` in a **separate process** answers from the first
