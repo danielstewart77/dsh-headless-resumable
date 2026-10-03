@@ -1,7 +1,7 @@
 {
   "name": "@hive/dsh-headless-resumable",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
   "description": "A resumable one-shot dsh surface: run a turn in the conversation the hive minted, and report the turn as data.",
   "type": "module",
   "main": "src/index.ts",
