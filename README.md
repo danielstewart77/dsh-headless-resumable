@@ -53,3 +53,43 @@ Fourteen, over the real `SessionStore` and `AgentRegistry` with a scripted agent
 factory, as upstream's own bundle tests do. `corepack pnpm vitest` does not work
 here — pnpm's pre-run dependency check shells out to a `pnpm` on `PATH`, which
 corepack does not install.
+
+## The command-line proof
+
+The tests run the module in-process. This runs it the way a mind will: the real
+`dsh` launcher, a profile directory, and a real model.
+
+`profile/` is that profile — `package.json` naming the two bundle layers
+(`@deepseek-ai/dsh-base`, then this package) and `cordis.patch.yml` pointing the
+model seam at this host's inference proxy. Copy it to
+`$DSH_HOME/profiles/hive/`, symlink this package into the profile's
+`node_modules/@hive/`, and export `HIVE_PROXY_KEY` with the mind's proxy
+credential. `dsh` resolves every in-box bundle from its own installation, so
+only this package needs the link.
+
+The upstream monorepo has to be built first, both faces:
+
+```sh
+./node_modules/.bin/tsc -b tsconfig.host.json
+./node_modules/.bin/tsdown --config-loader tsx --env.DSH_BUILD_FACE host
+./node_modules/.bin/tsc -b tsconfig.client.json
+./node_modules/.bin/tsdown --config-loader tsx --env.DSH_BUILD_FACE client
+```
+
+`--config-loader tsx` is not optional: tsdown 0.22's default config loader is
+`unrun`, which nothing in the lockfile installs, so `npm run build:lib:host`
+fails before compiling anything. Both faces are needed because `dsh-base`
+mounts `dsh-api-gateway`, whose `lib/index.js` is emitted by the client face.
+
+What it shows, on `qwen35-131k` through the proxy:
+
+- `--session-id <id> "..."` answers in the id it was handed and reports
+  `{"mode":"create","outcome":"completed"}`.
+- `--resume <id> "..."` in a **separate process** answers from the first
+  process's history — the turn that asked what word it had been told to use
+  answered with that word.
+- `--resume` against an id nothing ever created reports
+  `outcome: refused`, `NO_SUCH_SESSION`, and creates nothing.
+- No id at all is refused by the command line, before an agent exists.
+- A turn that reads a file reports `traffic: {emitted: 1, answered: 1,
+  succeeded: 1, callsByTool: {read: 1}}`.
